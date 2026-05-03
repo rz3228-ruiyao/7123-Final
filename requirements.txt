@@ -1,0 +1,24 @@
+# Core
+torch==2.6.0
+transformers==4.57.6
+peft==0.18.1
+accelerate>=0.34.0
+datasets>=3.0.0
+
+# Data and analysis
+pandas>=2.0.0
+numpy>=1.24.0
+Pillow>=10.0.0
+matplotlib>=3.7.0
+tqdm>=4.65.0
+
+# Optional (only if running data_analysis.ipynb's image-grid cell)
+# Most users will not need these explicitly — they come with transformers/torch.
+
+# Notes:
+# - torch 2.6.0+cu124 was the tested version on a Linux machine with CUDA 12.4.
+#   For other platforms, install torch from https://pytorch.org/get-started/locally/
+#   and keep the rest of these versions.
+# - transformers 4.57.6 is required because the Idefics3 / SmolVLM processor
+#   behavior changed between releases. Newer versions may also work but are untested.
+# - peft 0.18.1 is required for `use_dora=True` support in LoraConfig.

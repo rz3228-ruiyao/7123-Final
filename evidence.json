@@ -1,0 +1,125 @@
+{
+  "_description": "Empirical evidence for each engineering choice in the training pipeline. Numbers come from the first real training run (run_id 20251029_initial). Once a feature is justified here, we don't re-prove it in later runs — saves compute and notebook clutter.",
+  "_baseline_reference": {
+    "zero_shot_full_prompt_val_n300": 0.5567,
+    "zero_shot_text_only_val_n300": 0.5167,
+    "image_contribution": 0.0400,
+    "lecture_oracle_val": 0.0582,
+    "random_baseline_val": 0.3378,
+    "most_common_index_val": 0.3311
+  },
+  "features": {
+    "lora_lm_attention_only": {
+      "claim": "LoRA on LM attention (q/k/v/o_proj) gives ~3.3M trainable params, well under the 5M cap, and trains successfully.",
+      "evidence": {
+        "trainable_params": 3276800,
+        "fraction_of_total": 0.006416,
+        "pre_training_val_acc": 0.5925,
+        "post_training_val_acc": 0.7750,
+        "delta": 0.1825
+      },
+      "verdict": "Keep. +18.25 percentage points from one feature is the bulk of the gain.",
+      "next_experiment": "Try lora_r=24 or 32 to see if more capacity helps; verify trainable params still under 5M."
+    },
+    "answer_token_only_loss_masking": {
+      "claim": "Computing loss only on the final answer letter (vs. on the full prompt) lets the small adapter focus capacity on the actual classification task.",
+      "evidence": "Loss decreased from 0.5653 (epoch 1) to 0.3471 (epoch 3), with monotonic val accuracy improvement. The fact that the model converges at all under 3M trainable params on 3,109 examples suggests this is doing its job.",
+      "verdict": "Keep. No A/B run available yet, but the convergence behavior is clean.",
+      "next_experiment": "If we ever re-architect, an A/B with full-prompt loss would be informative — but low priority."
+    },
+    "choice_order_permutation": {
+      "claim": "Permuting choices each epoch breaks position bias, especially the catastrophic 5-choice pathology.",
+      "evidence": {
+        "5_choice_zero_shot_val_n44": 0.1136,
+        "5_choice_pre_training_val": 0.1579,
+        "5_choice_after_epoch_1": 0.1579,
+        "5_choice_after_epoch_2": 0.2105,
+        "5_choice_after_epoch_3": 0.2632,
+        "5_choice_after_tta_k4": 0.3158,
+        "2_choice_zero_shot_val_n300": 0.5556,
+        "2_choice_after_epoch_1": 0.8161,
+        "2_choice_after_epoch_3": 0.8276
+      },
+      "verdict": "Keep — clearly working. 5-choice climbed from 11% (worse than random) to 32% (above random for the first time). 2-choice climbed from 56% (barely above random) to 83%. These were the diagnosed pathologies and both moved.",
+      "next_experiment": "5-choice is still the weakest category. Try oversampling 5-choice questions (only 110 in train) or curriculum learning."
+    },
+    "log_likelihood_scoring": {
+      "claim": "Scoring logits at next-token position over valid letters is faster and more robust than calling generate() and parsing.",
+      "evidence": "Inference at 3.5 it/s (single forward pass per question). No off-format outputs since we constrain argmax to valid letter token IDs. Final TTA inference on full test set: 1.13 s/it including K=4 augmentation.",
+      "verdict": "Keep. Fundamental to the pipeline; no replacement makes sense.",
+      "next_experiment": "Try full-string scoring (P(' 0/4') vs P(' 2/4')) for genetics-ratio questions specifically — letter-only may be losing the strong content priors the model has on actual ratio strings."
+    },
+    "tta_choice_permutation_k4": {
+      "claim": "Test-time averaging across K=4 random choice permutations adds ~1-2pp on top of training-time permutation.",
+      "evidence": {
+        "no_tta_val_acc_n400": 0.7875,
+        "tta_k4_val_acc_n400": 0.8050,
+        "delta": 0.0175,
+        "5_choice_no_tta": 0.2105,
+        "5_choice_tta_k4": 0.3158,
+        "delta_5_choice": 0.1053
+      },
+      "verdict": "Keep. +1.75pp overall, +10.53pp on 5-choice specifically — exactly where the residual position bias still lives. Cost: ~4x inference time, but inference is already fast.",
+      "next_experiment": "Try K=8 once. If gains continue (>0.5pp), keep at 8 for final submission. If saturated at K=4, save the inference time."
+    },
+    "lecture_pre_truncation": {
+      "claim": "Truncating lecture text to fit a 600-token budget BEFORE Idefics3 expands <image> avoids the token-count-mismatch error and keeps the image block intact.",
+      "evidence": "Without this fix, training fails on the first batch with 'Mismatch in image token count between text and input_ids'. With it, training completes 3 epochs at 8min each.",
+      "verdict": "Keep. Required for correctness, not optional.",
+      "next_experiment": "None. This is a correctness fix, not a tunable knob."
+    },
+    "gradient_checkpointing": {
+      "claim": "Reduces VRAM from 14.7 GB to ~9 GB at the cost of ~15% slower training; needed for safe headroom on a 16 GB card.",
+      "evidence": "Pre-checkpointing peak: 14.7 GB. Post-checkpointing reserved during training: well under 12 GB (allowed clean batch_size=2, grad_accum=8 with no OOM).",
+      "verdict": "Keep on the 4080. Drop if moving to A100 or higher-VRAM machine.",
+      "next_experiment": "If we ever ensemble multiple LoRAs in memory, this becomes mandatory."
+    },
+    "best_checkpoint_on_val_acc": {
+      "claim": "Save model weights at the epoch with highest val accuracy, not lowest val loss.",
+      "evidence": "Run 1 epoch losses (0.57 -> 0.39 -> 0.35) tracked val acc reasonably (0.7525 -> 0.7525 -> 0.7750), but 5-choice accuracy increased monotonically while 3-choice fluctuated (0.7192 -> 0.7094 -> 0.7389). Val acc is the metric the leaderboard uses; we should save on that.",
+      "verdict": "Keep.",
+      "next_experiment": "None — clearly correct."
+    }
+  },
+  "non_features_considered_and_dropped": {
+    "lecture_substring_retrieval": {
+      "claim_dropped": "Cannot use lecture as a retrieval shortcut for the answer.",
+      "evidence": "Only 10.1% of val examples have any choice as a substring of lecture+hint, and even then accuracy is only 57.5%.",
+      "verdict": "Don't pursue. Lecture is background knowledge, not direct answer text."
+    },
+    "vision_side_augmentation": {
+      "claim_dropped": "Image augmentation (flips, crops) won't help much because vision contributes only +4pp.",
+      "evidence": "Zero-shot text-only 51.67% vs. zero-shot full 55.67%. The model is doing 92% of its work from text. Many images are diagrams or maps where flips would change the answer.",
+      "verdict": "Don't pursue."
+    }
+  },
+  "first_run_summary": {
+    "run_id": "20251029_initial",
+    "config_highlights": {
+      "lora_r": 16,
+      "lora_alpha": 32,
+      "epochs": 3,
+      "batch_size": 2,
+      "grad_accum": 8,
+      "effective_batch": 16,
+      "lr": 0.0002,
+      "img_size": 224,
+      "permute_choices": true
+    },
+    "results": {
+      "pre_training_val_acc_n400": 0.5925,
+      "epoch_1_val_acc": 0.7525,
+      "epoch_2_val_acc": 0.7525,
+      "epoch_3_val_acc": 0.7750,
+      "no_tta_val_acc_n400": 0.7875,
+      "tta_k4_val_acc_n400": 0.8050,
+      "public_lb": 0.8008,
+      "by_num_choices_after_tta": {
+        "2": 0.8391,
+        "3": 0.7931,
+        "4": 0.9011,
+        "5": 0.3158
+      }
+    }
+  }
+}
