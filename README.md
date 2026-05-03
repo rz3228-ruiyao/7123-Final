@@ -1,4 +1,4 @@
-# ScienceQA Multiple-Choice Fine-Tuning
+# Pixels to Predictions: DL Vision Challenge
 
 LoRA fine-tuning of SmolVLM-500M-Instruct for the NYU Deep Learning Spring 2026 ScienceQA Kaggle competition.
 
