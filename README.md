@@ -29,9 +29,7 @@ The most consequential learning-rate choice is the *extended cosine* schedule: s
 ├── training_v2.ipynb          # End-to-end training and inference pipeline
 ├── run_logger.py              # Append-only JSONL run logger imported by the notebook
 ├── evidence.json              # Per-feature justification with measured numbers
-└── report/
-    ├── report.tex             # LaTeX report
-    └── pics/                  # Figures (extracted from data_analysis.ipynb)
+
 ```
 
 ## Reproducing the Best Submission
