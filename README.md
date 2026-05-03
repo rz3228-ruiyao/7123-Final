@@ -109,7 +109,7 @@ The 16 experiments described in the report can all be reproduced by editing the 
 
 ## Model Weights
 
-Best LoRA adapter weights: [Google Drive link](https://drive.google.com/file/d/<placeholder>/view?usp=sharing)
+Best LoRA adapter weights: [Google Drive link](https://drive.google.com/file/d/1I3mHcwwGN-R5RUf2QYFx3qLK7amnFNdE/view?usp=sharing)
 
 Place the downloaded `best/` directory under `runs/lora_v2/<your_run_id>/` and load with `model.load_adapter()` to skip retraining.
 
